@@ -12,7 +12,7 @@ BASE_URL_ALUNO = "http://localhost:8501/Ambiente_Aluno?id_questao="
 st.title("🍎 Painel de Gestão Pedagógica")
 
 with st.form("form_cadastro"):
-    st.subheader("Cadastrar Novo Desafio Socrático")
+    st.subheader("Cadastrar novo Desafio Socrático")
     enunciado = st.text_area("Enunciado do problema:", height=150)
     arquivo = st.file_uploader("Adicionar Imagem Auxiliar (opcional)", type=['png', 'jpg', 'jpeg'])
     link = st.text_input("Link de referência externa (opcional):")
