@@ -4,7 +4,6 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
-
 class MathTutorEngine:
     def __init__(self, api_key: str):
         self.llm = ChatGoogleGenerativeAI(
@@ -12,7 +11,7 @@ class MathTutorEngine:
             google_api_key=api_key,
             temperature=0.1
         )
-        self.histories = {}  # Dicionário para gerenciar múltiplas sessões de alunos
+        self.histories = {}
 
     def get_session_history(self, session_id: str):
         if session_id not in self.histories:
@@ -20,7 +19,6 @@ class MathTutorEngine:
         return self.histories[session_id]
 
     def analisar_erro(self, enunciado, entrada):
-<<<<<<< HEAD
         # Implementação da Taxonomia de Radatz
         prompt = f"""
         Enunciado: {enunciado}
@@ -41,55 +39,34 @@ class MathTutorEngine:
         }}
         """
         res = self.llm.invoke(prompt)
-        # Limpeza robusta do JSON
         content = res.content.strip().replace("```json", "").replace("```", "")
         return json.loads(content)
 
     def gerar_resposta(self, session_id, enunciado, entrada, diag):
-
-        # Verificamos se o aluno já acertou segundo o diagnóstico de Radatz
+        # Lógica de Brousseau: Diferenciação entre mediação e finalização
         if diag.get('status') == 'acerto':
             system_instructions = f"""
             És um mediador baseado na Teoria das Situações Didáticas de Brousseau.
             O aluno ACERTOU o problema: {enunciado}.
-    
-            REGRAS DE FINALIZAÇÃO:
-            1. Reconheça formalmente o acerto (Fase de Institucionalização).
-            2. Sintetize o que foi aprendido (ex: a relação multiplicativa das áreas).
-            3. Encerre a conversa de forma motivadora, sem fazer novas perguntas.
+            REGRAS DE FINALIZAÇÃO (Institucionalização):
+            1. Reconheça formalmente o acerto.
+            2. Sintetize o conhecimento (relação multiplicativa das áreas).
+            3. Encerre de forma motivadora, sem novas perguntas.
             4. Use LaTeX.
             """
         else:
-            # Lógica anterior de mediação para erros ou acertos parciais
             system_instructions = f"""
             És um mediador baseado na Teoria das Situações Didáticas de Brousseau.
             Problema: {enunciado}
             Diagnóstico (Radatz): {diag['tipo_erro']}
-    
-            REGRAS DE INTERAÇÃO:
+            REGRAS DE INTERAÇÃO (Devolução e Validação):
             1. Nunca dês a resposta.
-            2. Fase de Devolução: Faz com que o aluno aceite a responsabilidade pelo problema.
-            3. Fase de Validação: Se o aluno errar, não corrijas. Apresenta um contra-exemplo ou pede para ele verificar a lógica.
-            4. Se for 'Dificuldade de Linguagem', pede para ele explicar o que entendeu de um termo específico.
-            5. Usa LaTeX para termos matemáticos.
+            2. Peça para o aluno explicar a lógica ou apresente contra-exemplos.
+            3. Use LaTeX.
             """
 
         prompt_template = ChatPromptTemplate.from_messages([
             ("system", system_instructions),
-=======
-        prompt = f"""
-        Enunciado: {enunciado}
-        Resposta do Aluno: {entrada}
-        Analise pedagogicamente e retorne APENAS JSON:
-        {{ "status": "erro/acerto", "tipo_erro": "conceitual/procedural/interpretacao", "conceito": "topico", "sugestao": "dica" }}
-        """
-        res = self.llm.invoke(prompt)
-        return json.loads(res.content.strip().replace("```json", "").replace("```", ""))
-
-    def gerar_resposta(self, session_id, enunciado, entrada, diag):
-        prompt_template = ChatPromptTemplate.from_messages([
-            ("system", f"És um Tutor Socrático. Problema: {enunciado}. Erro: {diag['tipo_erro']}. Use LaTeX."),
->>>>>>> origin/master
             MessagesPlaceholder(variable_name="history"),
             ("human", "{texto}")
         ])
