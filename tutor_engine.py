@@ -9,7 +9,6 @@ class MathTutorEngine:
     def __init__(self, api_key: str):
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
-            #model="gemini-1.5-flash",
             google_api_key=api_key,
             temperature=0.1
         )
@@ -21,6 +20,7 @@ class MathTutorEngine:
         return self.histories[session_id]
 
     def analisar_erro(self, enunciado, entrada):
+<<<<<<< HEAD
         # Implementação da Taxonomia de Radatz
         prompt = f"""
         Enunciado: {enunciado}
@@ -76,6 +76,20 @@ class MathTutorEngine:
 
         prompt_template = ChatPromptTemplate.from_messages([
             ("system", system_instructions),
+=======
+        prompt = f"""
+        Enunciado: {enunciado}
+        Resposta do Aluno: {entrada}
+        Analise pedagogicamente e retorne APENAS JSON:
+        {{ "status": "erro/acerto", "tipo_erro": "conceitual/procedural/interpretacao", "conceito": "topico", "sugestao": "dica" }}
+        """
+        res = self.llm.invoke(prompt)
+        return json.loads(res.content.strip().replace("```json", "").replace("```", ""))
+
+    def gerar_resposta(self, session_id, enunciado, entrada, diag):
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", f"És um Tutor Socrático. Problema: {enunciado}. Erro: {diag['tipo_erro']}. Use LaTeX."),
+>>>>>>> origin/master
             MessagesPlaceholder(variable_name="history"),
             ("human", "{texto}")
         ])
