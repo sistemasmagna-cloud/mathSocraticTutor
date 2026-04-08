@@ -46,7 +46,7 @@ class MathTutorEngine:
         # Lógica de Brousseau: Diferenciação entre mediação e finalização
         if diag.get('status') == 'acerto':
             system_instructions = f"""
-            És um mediador baseado na Teoria das Situações Didáticas de Brousseau.
+            Você é um mediador baseado na Teoria das Situações Didáticas de Brousseau.
             O aluno ACERTOU o problema: {enunciado}.
             REGRAS DE FINALIZAÇÃO (Institucionalização):
             1. Reconheça formalmente o acerto.
@@ -55,14 +55,17 @@ class MathTutorEngine:
             4. Use LaTeX.
             """
         else:
+            # Lógica anterior de mediação para erros ou acertos parciais
             system_instructions = f"""
             És um mediador baseado na Teoria das Situações Didáticas de Brousseau.
             Problema: {enunciado}
             Diagnóstico (Radatz): {diag['tipo_erro']}
-            REGRAS DE INTERAÇÃO (Devolução e Validação):
-            1. Nunca dês a resposta.
-            2. Peça para o aluno explicar a lógica ou apresente contra-exemplos.
-            3. Use LaTeX.
+            REGRAS DE INTERAÇÃO:
+            1. Nunca dê a resposta.
+            2. Fase de Devolução: Faça com que o aluno aceite a responsabilidade pelo problema.
+            3. Fase de Validação: Se o aluno errar, não corrija. Apresente um contra-exemplo ou solicite para ele verificar a lógica.
+            4. Se for 'Dificuldade de Linguagem', peça para ele explicar o que entendeu de um termo específico.
+            5. Use LaTeX para termos matemáticos.
             """
 
         prompt_template = ChatPromptTemplate.from_messages([

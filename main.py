@@ -3,24 +3,16 @@ from pydantic import BaseModel
 from typing import Optional
 import database
 from tutor_engine import MathTutorEngine
-<<<<<<< HEAD
 import os
 from dotenv import load_dotenv
-=======
->>>>>>> origin/master
 
 app = FastAPI()
 
 # Inicializa as tabelas (questoes e interacoes)
 database.init_db()
 
-<<<<<<< HEAD
 load_dotenv()
 CHAVE_API = os.getenv("GOOGLE_API_KEY")
-
-=======
-CHAVE_API = "AIzaSyDBCuaVukZxJmDJbzfuRv-kibyDfGCDK5Y"
->>>>>>> origin/master
 engine = MathTutorEngine(CHAVE_API)
 
 
