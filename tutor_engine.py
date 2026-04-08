@@ -11,7 +11,8 @@ class MathTutorEngine:
             google_api_key=api_key,
             temperature=0.1
         )
-        self.histories = {}
+        self.histories = {} # Dicionário para gerenciar múltiplas sessões de alunos
+
 
     def get_session_history(self, session_id: str):
         if session_id not in self.histories:
@@ -57,7 +58,7 @@ class MathTutorEngine:
         else:
             # Lógica anterior de mediação para erros ou acertos parciais
             system_instructions = f"""
-            És um mediador baseado na Teoria das Situações Didáticas de Brousseau.
+            Você é um mediador baseado na Teoria das Situações Didáticas de Brousseau.
             Problema: {enunciado}
             Diagnóstico (Radatz): {diag['tipo_erro']}
             REGRAS DE INTERAÇÃO:
