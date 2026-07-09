@@ -26,7 +26,7 @@ class QuestaoSchema(BaseModel):
 
 class InteracaoSchema(BaseModel):
     sessao_id: str
-    questao_id: int
+    questao_id: int  # Agora vinculamos ao ID da questão
     mensagem: str
 
 
@@ -51,6 +51,7 @@ async def cadastrar(data: QuestaoSchema):
 async def buscar_questao(qid: int):
     questao = database.obter_questao(qid)
     if questao:
+        # Converte a linha do SQLite para dicionário
         return dict(questao)
     raise HTTPException(status_code=404, detail="Questão não encontrada")
 
@@ -64,32 +65,19 @@ async def aluno_enviar(data: InteracaoSchema):
 
     enunciado = questao["enunciado"]
 
-    # 2. IA: Chamada Unificada (Análise Radatz + Resposta Brousseau)
-    # Como o novo motor usa streaming (yield), consumimos o gerador para obter o texto final
-    # No main.py, dentro de aluno_enviar:
-    try:
-        resposta_gerador = engine.gerar_resposta_socratica(data.sessao_id, enunciado, data.mensagem)
-        lista_resposta = list(resposta_gerador)
-        print(f"DEBUG - Resposta da IA: {lista_resposta}")  # Veja se isso aparece no terminal do PyCharm
-        resposta_final = "".join(lista_resposta)
-    except Exception as e:
-        print(f"Erro no main: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # 2. IA: Diagnóstico de Erro
+    diag = engine.analisar_erro(enunciado, data.mensagem)
 
-    # 3. Banco de Dados: Salva a interação
-    # O diagnóstico agora é processado internamente pela IA para maior velocidade.
-    # Enviamos um log simplificado para o campo 'diag' do seu banco de dados.
-    diag_log = {"info": "Processamento integrado Gemini 2.5-Flash (Radatz+Brousseau)"}
+    # 3. IA: Resposta Socrática
+    resposta = engine.gerar_resposta(data.sessao_id, enunciado, data.mensagem, diag)
 
+    # 4. Banco de Dados: Salva a interação vinculada à questão
     database.salvar_interacao(
         sessao_id=data.sessao_id,
         questao_id=data.questao_id,
         entrada=data.mensagem,
-        diag=diag_log,
-        resposta=resposta_final
+        diag=diag,
+        resposta=resposta
     )
 
-    return {
-        "resposta_tutor": resposta_final,
-        "diagnostico_interno": "Análise de Radatz concluída com sucesso."
-    }
+    return {"resposta_tutor": resposta, "diagnostico": diag}
