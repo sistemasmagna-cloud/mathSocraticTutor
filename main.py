@@ -1,10 +1,12 @@
+import json
+import os
+from typing import Optional
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+
 import database
 from tutor_engine import MathTutorEngine
-import os
-from dotenv import load_dotenv
 
 app = FastAPI()
 
@@ -12,7 +14,7 @@ app = FastAPI()
 database.init_db()
 
 load_dotenv()
-CHAVE_API = os.getenv("GOOGLE_API_KEY")
+CHAVE_API = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 engine = MathTutorEngine(CHAVE_API)
 
 
@@ -64,32 +66,52 @@ async def aluno_enviar(data: InteracaoSchema):
 
     enunciado = questao["enunciado"]
 
-    # 2. IA: Chamada Unificada (Análise Radatz + Resposta Brousseau)
-    # Como o novo motor usa streaming (yield), consumimos o gerador para obter o texto final
-    # No main.py, dentro de aluno_enviar:
+    # 2. Chamada da IA
     try:
-        resposta_gerador = engine.gerar_resposta_socratica(data.sessao_id, enunciado, data.mensagem)
+        resposta_gerador = engine.analisar_resposta_stream(
+            questao_enunciado=enunciado,
+            resposta_aluno=data.mensagem
+        )
         lista_resposta = list(resposta_gerador)
-        print(f"DEBUG - Resposta da IA: {lista_resposta}")  # Veja se isso aparece no terminal do PyCharm
-        resposta_final = "".join(lista_resposta)
-    except Exception as e:
-        print(f"Erro no main: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        resposta_json_raw = "".join(lista_resposta).strip()
+        print(f"\n--- DEBUG IA RAW ---\n{resposta_json_raw}\n-------------------\n")
 
-    # 3. Banco de Dados: Salva a interação
-    # O diagnóstico agora é processado internamente pela IA para maior velocidade.
-    # Enviamos um log simplificado para o campo 'diag' do seu banco de dados.
-    diag_log = {"info": "Processamento integrado Gemini 2.5-Flash (Radatz+Brousseau)"}
+        # Remove formatação Markdown caso o modelo envolva em ```json ... ```
+        if resposta_json_raw.startswith("```"):
+            resposta_json_raw = resposta_json_raw.strip("`")
+            if resposta_json_raw.startswith("json"):
+                resposta_json_raw = resposta_json_raw[4:].strip()
+
+        # Converte a string JSON em dicionário
+        dados_ia = json.loads(resposta_json_raw)
+
+        mensagem_aluno = dados_ia.get("aluno", {}).get("mensagem_socratica", "")
+        diag_professor = dados_ia.get("professor", {})
+
+    except Exception as e:
+        print(f"⚠️ Erro ao processar JSON da IA: {e}")
+        # Fallback de segurança: se a IA não retornar JSON, salva o texto como resposta do tutor
+        mensagem_aluno = resposta_json_raw if 'resposta_json_raw' in locals() else "Desculpe, tive um problema ao processar sua resposta."
+        diag_professor = {
+            "categoria_radatz": "Não identificado",
+            "termo_didatico": "Erro de Processamento",
+            "evidencia_erro": "A resposta da IA não veio no formato JSON esperado.",
+            "sugestao_intervencao": "Verifique os logs da API."
+        }
+
+    # 3. Salva no Banco de Dados (agora roda com garantia!)
+    status_resp = dados_ia.get("status_resposta", "incorreta")
 
     database.salvar_interacao(
         sessao_id=data.sessao_id,
         questao_id=data.questao_id,
         entrada=data.mensagem,
-        diag=diag_log,
-        resposta=resposta_final
+        diag=diag_professor,
+        resposta=mensagem_aluno,
+        status_resposta=status_resp  # <-- passa a flag de acerto/erro
     )
 
     return {
-        "resposta_tutor": resposta_final,
-        "diagnostico_interno": "Análise de Radatz concluída com sucesso."
+        "resposta_tutor": mensagem_aluno,
+        "diagnostico_interno": diag_professor
     }

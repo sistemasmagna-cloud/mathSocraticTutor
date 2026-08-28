@@ -15,7 +15,7 @@ def init_db():
                 link_externo TEXT
             )
         ''')
-        # Tabela de Interações atualizada
+        # Tabela de Interações atualizada com a Análise Dual (Radatz + Brousseau)
         conn.execute('''
             CREATE TABLE IF NOT EXISTS interacoes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,9 +23,11 @@ def init_db():
                 questao_id INTEGER, 
                 sessao_id TEXT,
                 entrada_aluno TEXT,
-                status TEXT,
-                tipo_erro TEXT,
-                conceito TEXT,
+                status_resposta TEXT,
+                categoria_radatz TEXT,
+                termo_didatico TEXT,
+                evidencia_erro TEXT,
+                sugestao_intervencao TEXT,
                 resposta_tutor TEXT,
                 FOREIGN KEY (questao_id) REFERENCES questoes (id)
             )
@@ -49,20 +51,29 @@ def obter_questao(questao_id):
         cursor.execute('SELECT * FROM questoes WHERE id = ?', (questao_id,))
         return cursor.fetchone()
 
-def salvar_interacao(sessao_id, questao_id, entrada, diag, resposta):
+def salvar_interacao(sessao_id, questao_id, entrada, diag, resposta, status_resposta="incorreta"):
+    """
+    Salva a interação recebendo o dicionário 'diag' gerado para o professor.
+    """
+    # Garante que 'diag' seja um dicionário mesmo se vier nulo por segurança
+    diag = diag if isinstance(diag, dict) else {}
+
     with sqlite3.connect(DB_NAME) as conn:
         conn.execute('''
             INSERT INTO interacoes 
-            (timestamp, sessao_id, questao_id, entrada_aluno, status, tipo_erro, conceito, resposta_tutor)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (timestamp, sessao_id, questao_id, entrada_aluno, status_resposta, 
+             categoria_radatz, termo_didatico, evidencia_erro, sugestao_intervencao, resposta_tutor)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             datetime.now().isoformat(),
             sessao_id,
             questao_id,
             entrada,
-            diag.get("status"),
-            diag.get("tipo_erro"),
-            diag.get("conceito"),
+            status_resposta,
+            diag.get("categoria_radatz", "Não classificado"),
+            diag.get("termo_didatico", "Não classificado"),
+            diag.get("evidencia_erro", ""),
+            diag.get("sugestao_intervencao", ""),
             resposta
         ))
         conn.commit()

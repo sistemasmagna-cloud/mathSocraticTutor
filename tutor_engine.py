@@ -1,68 +1,75 @@
 import json
+import os
 from google import genai
-from google.genai import types  # Importação essencial para evitar erros de validação
+from google.genai import types
+
+SYSTEM_INSTRUCTION = """
+Você é o MathSocraticTutor, um assistente pedagógico inteligente para o ensino de Matemática baseado na Teoria das Situações Didáticas (Brousseau) e na Análise de Erros (Radatz).
+
+Sua tarefa é analisar a resposta fornecida pelo aluno e responder ESTRITAMENTE em formato JSON.
+NUNCA adicione textos fora do JSON, como "💡 Dica pedagógica", explicações ou marcadores markdown extras.
+
+--- FORMATO DE SAÍDA OBRIGATÓRIO (JSON) ---
+{
+  "status_resposta": "incorreta",
+  "aluno": {
+    "mensagem_socratica": "Pergunta ou provocação didática direcionada ao aluno."
+  },
+  "professor": {
+    "categoria_radatz": "Associações Deficientes",
+    "termo_didatico": "Confusão de Conceitos",
+    "evidencia_erro": "O aluno usou a operação de subtração em vez de adição para representar o aumento no comprimento.",
+    "sugestao_intervencao": "Peça para o aluno destacar a palavra 'aumentado' no enunciado e associar ao sinal matemático correto."
+  }
+}
+
+--- REGRAS PARA O ALUNO ---
+- NÃO dê a resposta pronta nem revele a fórmula final.
+- Faça uma pergunta investigativa (socrática) para que ele perceba o erro por conta própria.
+
+--- REGRAS PARA O PROFESSOR ---
+- Categorias de Radatz x Termo Didático:
+  * Dificuldade de Linguagem -> "Interpretação de Texto / Vocabulário"
+  * Processamento Espacial -> "Raciocínio Visual / Geométrico"
+  * Associações Deficientes -> "Confusão de Conceitos ou Fórmulas"
+  * Regras Irrelevantes -> "Uso de Macetes / Aplicação Incorreta de Regra"
+  * Erro de Execução -> "Cálculo Básico ou Digitação"
+  * Nenhum Erro -> "Compreensão Adequada"
+"""
+
 
 class MathTutorEngine:
-    def __init__(self, api_key: str):
-        # Inicializa o cliente normalmente
-        self.client = genai.Client(
-            api_key=api_key,
-            http_options={'api_version': 'v1'}
+    def __init__(self, api_key: str = None):
+        self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not self.api_key:
+            raise ValueError("API Key do Gemini não foi encontrada.")
+
+        self.client = genai.Client(api_key=self.api_key)
+        self.model_name = "gemini-2.5-flash"
+
+    def analisar_resposta_stream(self, questao_enunciado: str, resposta_aluno: str):
+        prompt_usuario = f"""
+        [ENUNCIADO DA QUESTÃO]:
+        {questao_enunciado}
+
+        [RESPOSTA SUBMETIDA PELO ALUNO]:
+        {resposta_aluno}
+
+        Retorne o diagnóstico do PROFESSOR e a mediação para o ALUNO exclusivamente no formato JSON especificado.
+        """
+
+        config = types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION,
+            response_mime_type="application/json",
+            temperature=0.1  # Temperatura baixa para garantir adesão ao formato JSON
         )
-        self.model_id = "gemini-2.5-flash"
-        self.histories = {}
 
-    def get_session_history(self, session_id: str):
-        if session_id not in self.histories:
-            self.histories[session_id] = []
-        return self.histories[session_id]
+        response_stream = self.client.models.generate_content_stream(
+            model=self.model_name,
+            contents=prompt_usuario,
+            config=config
+        )
 
-    def gerar_resposta_socratica(self, session_id, enunciado, entrada_aluno):
-        historico = self.get_session_history(session_id)
-
-        # Se o histórico estiver vazio, adicionamos as instruções como a primeira mensagem 'user'
-        # Isso garante que o modelo siga as regras sem usar o campo problemático do JSON
-        if not historico:
-            instrucoes_iniciais = f"""
-            Você é um tutor de matemática de IA baseado na Teoria das Situações Didáticas (Brousseau).
-            Sua tarefa é mediar o aprendizado do problema: "{enunciado}"
-
-            DIRETRIZES TÉCNICAS (Uso Interno):
-            1. ANALISE o erro do aluno silenciosamente usando a Taxonomia de Radatz.
-            2. FASE DE DEVOLUÇÃO: Faça o aluno assumir a responsabilidade sem dar a resposta.
-            3. FASE DE VALIDAÇÃO: Se o aluno errar, apresente um contra-exemplo.
-            4. INSTITUCIONALIZAÇÃO: Se o aluno acertar, formalize o conceito e encerre.
-
-            REGRAS DE OURO:
-            - NUNCA dê a resposta final.
-            - Use LaTeX para toda notação matemática.
-            - Seja encorajador, mas desafiador (Socrático).
-            """
-            historico.append({"role": "user", "parts": [{"text": instrucoes_iniciais}]})
-            historico.append({"role": "model", "parts": [{"text": "Entendido. Estou pronto para mediar este problema seguindo as fases de Brousseau e a taxonomia de Radatz. Como o aluno começou?"}]})
-
-        conteudo_atual = {"role": "user", "parts": [{"text": f"Entrada do aluno: {entrada_aluno}"}]}
-
-        try:
-            # Chamada simplificada: removemos o system_instruction do config para evitar o erro 400
-            response = self.client.models.generate_content_stream(
-                model=self.model_id,
-                contents=historico + [conteudo_atual],
-                config=types.GenerateContentConfig(
-                    temperature=0.2,
-                )
-            )
-
-            texto_completo = ""
-            for chunk in response:
-                if chunk.text:
-                    texto_completo += chunk.text
-                    yield chunk.text
-
-            if texto_completo:
-                historico.append(conteudo_atual)
-                historico.append({"role": "model", "parts": [{"text": texto_completo}]})
-
-        except Exception as e:
-            print(f"Erro detalhado na engine: {str(e)}")
-            yield f"Erro na conexão: {str(e)}"
+        for chunk in response_stream:
+            if chunk.text:
+                yield chunk.text

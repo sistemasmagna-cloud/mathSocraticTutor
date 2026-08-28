@@ -1,9 +1,13 @@
-import streamlit as st
-import requests
 import os
+import requests
+import streamlit as st
+from app.utils.session_manager import exigir_autenticacao
 
-# Configuração da página para focar no Chat
-st.set_page_config(page_title="MATH-SENSE: Área do Aluno", layout="centered")
+# 1. O PRIMEIRO comando Streamlit DEVE ser o set_page_config
+st.set_page_config(page_title="MATH-SENSE: Área do Aluno", layout="wide")
+
+# 2. Em seguida, acionamos o guardião de autenticação
+exigir_autenticacao(perfil_requerido="Aluno")
 
 API_URL = "http://127.0.0.1:8000"
 

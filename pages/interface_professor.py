@@ -2,12 +2,15 @@ import streamlit as st
 import requests
 import os
 from utils import gerar_imagem_qrcode  # Importando a função acima
+from app.utils.session_manager import exigir_autenticacao
 
 st.set_page_config(page_title="Painel do Professor - MATH-SENSE", layout="wide")
 
+exigir_autenticacao(perfil_requerido="Professor")
+
 API_URL = "http://127.0.0.1:8000"
 # URL base onde a página do aluno estará hospedada (ajuste conforme seu servidor)
-BASE_URL_ALUNO = "http://localhost:8501/Ambiente_Aluno?id_questao="
+BASE_URL_ALUNO = "http://localhost:8501/interface_aluno?id_questao="
 
 st.title("🍎 Painel de Gestão Pedagógica")
 
@@ -27,8 +30,8 @@ if btn_enviar:
         nome_imagem = None
         if arquivo:
             nome_imagem = arquivo.name
-            if not os.path.exists("uploads"): os.makedirs("uploads")
-            with open(os.path.join("uploads", nome_imagem), "wb") as f:
+            if not os.path.exists("../uploads"): os.makedirs("../uploads")
+            with open(os.path.join("../uploads", nome_imagem), "wb") as f:
                 f.write(arquivo.getbuffer())
 
         # 2. Envia para o Backend
